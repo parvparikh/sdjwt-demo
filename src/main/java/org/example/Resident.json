@@ -1,0 +1,19 @@
+{"Residents": {
+  "Resident": [
+    {
+
+      "id": "1",
+      "Full_name": "John Doe",
+      "Gender": "Male",
+      "Date_of_birth": "01-01-1970",
+      "ID_type": "National",
+      "Status": "Valid",
+      "UIN": "9876543210",
+      "Phone_number": "9876543210",
+      "Generated_on": "22-01-2024",
+      "Email": "johndoe@email.com",
+      "Address": "Address 1 of john doe"
+    }
+  ]
+}
+}
