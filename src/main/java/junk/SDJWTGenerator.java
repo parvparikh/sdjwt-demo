@@ -1,4 +1,4 @@
-package org.example;
+package junk;
 
 import com.authlete.sd.SDJWT;
 import com.authlete.sd.Disclosure;
