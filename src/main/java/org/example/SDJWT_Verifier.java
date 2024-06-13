@@ -1,69 +1,64 @@
 package org.example;
 
-import com.authlete.sd.Disclosure;
 import com.authlete.sd.SDJWT;
+import com.authlete.sd.Disclosure;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
 import java.text.ParseException;
-import java.util.List;
+import java.util.*;
 
 public class SDJWT_Verifier {
 
-    private static final String SHARED_SECRET = "17627FB44D699A8A29E871FA8EFD8ABCDE0123456789ABCDEF0123456789AB";
+    private static final String SHARED_SECRET_ISSUER1 = "d4a4c1717b71aa81508edccacc2be8ce1c95867bc90d5d3ad33c3cb0a41b3099";
+    private static final String SHARED_SECRET_ISSUER2 = "95c7461240a7194e415341244f3f42e22e59fe35e8f58e61e6e2d0ee75e05a71";
 
     public static void main(String[] args) {
-        try {
-            // Example SD-JWT received from the holder
-            String sdJwtString = "eyJhbGciOiJIUzI1NiJ9.eyJSZXNpZGVudHMuUmVzaWRlbnRbMF0uRGF0ZV9vZl9iaXJ0aCI6IjAxLTAxLTE5NzAiLCJSZXNpZGVudHMuUmVzaWRlbnRbMF0uVUlOIjoiOTg3NjU0MzIxMCIsIlJlc2lkZW50cy5SZXNpZGVudFswXS5FbWFpbCI6ImpvaG5kb2VAZW1haWwuY29tIiwiUmVzaWRlbnRzLlJlc2lkZW50WzBdLmlkIjoiMSIsIlJlc2lkZW50cy5SZXNpZGVudFswXS5TdGF0dXMiOiJWYWxpZCIsIlJlc2lkZW50cy5SZXNpZGVudFswXS5BZGRyZXNzIjoiQWRkcmVzcyAxIG9mIGpvaG4gZG9lIiwiUmVzaWRlbnRzLlJlc2lkZW50WzBdLlBob25lX251bWJlciI6Ijk4NzY1NDMyMTAiLCJSZXNpZGVudHMuUmVzaWRlbnRbMF0uR2VuZXJhdGVkX29uIjoiMjItMDEtMjAyNCIsIlJlc2lkZW50cy5SZXNpZGVudFswXS5HZW5kZXIiOiJNYWxlIiwiUmVzaWRlbnRzLlJlc2lkZW50WzBdLklEX3R5cGUiOiJOYXRpb25hbCIsIlJlc2lkZW50cy5SZXNpZGVudFswXS5GdWxsX25hbWUiOiJKb2huIERvZSJ9.ennLANXpusa8wwxbD78jQHJ_yXoRtRYnSBUNzWYWssM~WyI3WktEWjV3RjlHbjdXLUJIYTNTdHR3IiwiUmVzaWRlbnRzLlJlc2lkZW50WzBdLmlkIiwiMSJd~WyJzWHVTNUNPWXA2VVlSQ3J4QVhCdm13IiwiUmVzaWRlbnRzLlJlc2lkZW50WzBdLkdlbmRlciIsIk1hbGUiXQ~WyJxTDZERnlrd2FSQlkxSXJpZnFNZmhBIiwiUmVzaWRlbnRzLlJlc2lkZW50WzBdLkRhdGVfb2ZfYmlydGgiLCIwMS0wMS0xOTcwIl0~WyJ2dVRkMGNfNDhKY0ducWQxbTlDS0R3IiwiUmVzaWRlbnRzLlJlc2lkZW50WzBdLklEX3R5cGUiLCJOYXRpb25hbCJd~";
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Enter the combined SD-JWT:");
+        String jwtString = scanner.nextLine();
 
-            // Verify the SD-JWT
-            verifySDJWT(sdJwtString);
-        } catch (Exception e) {
-            System.err.println("An error occurred: " + e.getMessage());
-            e.printStackTrace();
+        try {
+            SDJWT sdJwt = SDJWT.parse(jwtString);
+            decodeAndVerifySDJWT(sdJwt);
+        } catch (JOSEException | ParseException e) {
+            System.err.println("Error occurred while decoding SD-JWT: " + e.getMessage());
         }
     }
 
-    private static void verifySDJWT(String sdJwtString) {
-        try {
-            // Parse the received SD-JWT
-            SDJWT sdJwt = SDJWT.parse(sdJwtString);
+    private static void decodeAndVerifySDJWT(SDJWT sdJwt) throws ParseException, JOSEException {
+        String jwtString = sdJwt.getCredentialJwt();
+        SignedJWT signedJWT = SignedJWT.parse(jwtString);
 
-            // Extract JWT from SD-JWT
-            String jwtString = sdJwt.getCredentialJwt();
+        JWSVerifier verifierIssuer1 = new MACVerifier(SHARED_SECRET_ISSUER1.getBytes());
+        JWSVerifier verifierIssuer2 = new MACVerifier(SHARED_SECRET_ISSUER2.getBytes());
 
-            // Parse the JWT
-            SignedJWT signedJWT = SignedJWT.parse(jwtString);
+        if (signedJWT.verify(verifierIssuer1)) {
+            System.out.println("Signature verified with Issuer1's secret: VALID");
+        } else if (signedJWT.verify(verifierIssuer2)) {
+            System.out.println("Signature verified with Issuer2's secret: VALID");
+        } else {
+            System.out.println("Signature: INVALID");
+            return;
+        }
 
-            // Print JWT Header
-            System.out.println("JWT Header:");
-            JWSHeader header = signedJWT.getHeader();
-            System.out.println(header.toJSONObject());
+        JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
+        List<Disclosure> disclosures = sdJwt.getDisclosures();
 
-            // Print JWT Payload
-            System.out.println("JWT Payload:");
-            JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
-            System.out.println(claimsSet.toJSONObject());
+        System.out.println("JWT Header:");
+        JWSHeader header = signedJWT.getHeader();
+        System.out.println(header.toJSONObject());
 
-            // Print disclosures
-            List<Disclosure> disclosures = sdJwt.getDisclosures();
-            System.out.println("Disclosures:");
-            for (Disclosure disclosure : disclosures) {
-                System.out.println(disclosure.getClaimName() + ": " + disclosure.getClaimValue());
-            }
+        System.out.println("JWT Payload:");
+        System.out.println(claimsSet.toJSONObject());
 
-            // Verify the JWT signature
-            JWSVerifier verifier = new MACVerifier(SHARED_SECRET.getBytes());
-            if (signedJWT.verify(verifier)) {
-                System.out.println("Signature: VALID");
-            } else {
-                System.out.println("Signature: INVALID");
-            }
-        } catch (Exception e) {
-            System.err.println("Error occurred while verifying SD-JWT: " + e.getMessage());
+        System.out.println("Disclosures:");
+        for (Disclosure disclosure : disclosures) {
+            String claimValue = (String) disclosure.getClaimValue();
+            String decodedValue = new String(Base64.getDecoder().decode(claimValue.getBytes()));
+            System.out.println(disclosure.getClaimName() + ": " + decodedValue);
         }
     }
 }
