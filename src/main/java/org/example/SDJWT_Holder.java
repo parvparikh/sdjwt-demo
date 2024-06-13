@@ -7,6 +7,8 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
+import java.io.*;
+import java.net.Socket;
 import java.text.ParseException;
 import java.util.*;
 
@@ -65,6 +67,14 @@ public class SDJWT_Holder {
 
             System.out.println("Final combined SD-JWT to send to verifier:");
             System.out.println(combinedSdJwt.toString());
+
+            System.out.println("Enter the verifier's address:");
+            String address = scanner.nextLine();
+            System.out.println("Enter the verifier's port:");
+            int port = Integer.parseInt(scanner.nextLine());
+
+            sendToVerifier(combinedSdJwt.toString(), address, port);
+
         } catch (Exception e) {
             System.err.println("An error occurred: " + e.getMessage());
             e.printStackTrace();
@@ -87,7 +97,6 @@ public class SDJWT_Holder {
         }
         JWTClaimsSet claimsSet = claimsBuilder.build();
 
-        // Assuming the holder uses the shared secret from Issuer1 to sign the combined JWT.
         byte[] sharedSecret = "d4a4c1717b71aa81508edccacc2be8ce1c95867bc90d5d3ad33c3cb0a41b3099".getBytes();
 
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
@@ -95,5 +104,21 @@ public class SDJWT_Holder {
         signedJWT.sign(new MACSigner(sharedSecret));
 
         return signedJWT.serialize();
+    }
+
+    private static void sendToVerifier(String sdJwt, String address, int port) {
+        try (Socket socket = new Socket(address, port);
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+
+            out.println(sdJwt);
+            System.out.println("SD-JWT sent to verifier.");
+
+            String response = in.readLine();
+            System.out.println("Response from verifier: " + response);
+
+        } catch (IOException e) {
+            System.err.println("Error occurred while communicating with verifier: " + e.getMessage());
+        }
     }
 }

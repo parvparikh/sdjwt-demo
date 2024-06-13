@@ -7,6 +7,9 @@ import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.text.ParseException;
 import java.util.*;
 
@@ -17,48 +20,74 @@ public class SDJWT_Verifier {
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Enter the combined SD-JWT:");
-        String jwtString = scanner.nextLine();
+        System.out.println("Enter the port to listen on:");
+        int port = Integer.parseInt(scanner.nextLine());
 
-        try {
-            SDJWT sdJwt = SDJWT.parse(jwtString);
-            decodeAndVerifySDJWT(sdJwt);
-        } catch (JOSEException | ParseException e) {
-            System.err.println("Error occurred while decoding SD-JWT: " + e.getMessage());
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Verifier is listening on port " + port);
+
+            while (true) {
+                try (Socket socket = serverSocket.accept();
+                     BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                     PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+
+                    String sdJwtString = in.readLine();
+                    SDJWT sdJwt = SDJWT.parse(sdJwtString);
+                    boolean isValid = decodeAndVerifySDJWT(sdJwt);
+
+                    if (isValid) {
+                        out.println("SD-JWT is valid and verified.");
+                    } else {
+                        out.println("SD-JWT is invalid.");
+                    }
+
+                } catch (ParseException | JOSEException e) {
+                    System.err.println("Error occurred while decoding SD-JWT: " + e.getMessage());
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error occurred while setting up server: " + e.getMessage());
         }
     }
 
-    private static void decodeAndVerifySDJWT(SDJWT sdJwt) throws ParseException, JOSEException {
+    private static boolean decodeAndVerifySDJWT(SDJWT sdJwt) throws ParseException, JOSEException {
         String jwtString = sdJwt.getCredentialJwt();
         SignedJWT signedJWT = SignedJWT.parse(jwtString);
 
         JWSVerifier verifierIssuer1 = new MACVerifier(SHARED_SECRET_ISSUER1.getBytes());
         JWSVerifier verifierIssuer2 = new MACVerifier(SHARED_SECRET_ISSUER2.getBytes());
 
+        boolean isValid = false;
+
         if (signedJWT.verify(verifierIssuer1)) {
             System.out.println("Signature verified with Issuer1's secret: VALID");
+            isValid = true;
         } else if (signedJWT.verify(verifierIssuer2)) {
             System.out.println("Signature verified with Issuer2's secret: VALID");
+            isValid = true;
         } else {
             System.out.println("Signature: INVALID");
-            return;
         }
 
-        JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
-        List<Disclosure> disclosures = sdJwt.getDisclosures();
+        if (isValid) {
+            JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
+            List<Disclosure> disclosures = sdJwt.getDisclosures();
 
-        System.out.println("JWT Header:");
-        JWSHeader header = signedJWT.getHeader();
-        System.out.println(header.toJSONObject());
+            System.out.println("JWT Header:");
+            JWSHeader header = signedJWT.getHeader();
+            System.out.println(header.toJSONObject());
 
-        System.out.println("JWT Payload:");
-        System.out.println(claimsSet.toJSONObject());
+            System.out.println("JWT Payload:");
+            System.out.println(claimsSet.toJSONObject());
 
-        System.out.println("Disclosures:");
-        for (Disclosure disclosure : disclosures) {
-            String claimValue = (String) disclosure.getClaimValue();
-            String decodedValue = new String(Base64.getDecoder().decode(claimValue.getBytes()));
-            System.out.println(disclosure.getClaimName() + ": " + decodedValue);
+            System.out.println("Disclosures:");
+            for (Disclosure disclosure : disclosures) {
+                String claimValue = (String) disclosure.getClaimValue();
+                String decodedValue = new String(Base64.getDecoder().decode(claimValue.getBytes()));
+                System.out.println(disclosure.getClaimName() + ": " + decodedValue);
+            }
         }
+
+        return isValid;
     }
 }
