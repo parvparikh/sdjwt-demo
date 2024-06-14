@@ -14,25 +14,34 @@ import java.io.IOException;
 import java.util.*;
 
 public class SDJWT_Issuer1 {
-    private static final String JSON_DATA = "{\"License\": {\"Name\": \"John Doe\",\"DOB\": \"01-01-1980\",\"LicenseNumber\": \"DL1234567890\",\"ExpiryDate\": \"01-01-2030\"}}";
-    private static final String SHARED_SECRET_ISSUER1 = "d4a4c1717b71aa81508edccacc2be8ce1c95867bc90d5d3ad33c3cb0a41b3099";
 
     public static void main(String[] args) {
-        try {
-            Map<String, Object> jsonData = parseJson(JSON_DATA);
-            Map<String, Object> allKeys = new LinkedHashMap<>();
-            extractKeys("", jsonData, allKeys);
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Enter user ID for Issuer1: ");
+        String userId = scanner.nextLine();
 
-            if (allKeys.isEmpty()) {
-                System.err.println("No data found in JSON.");
+        String sharedSecret = SharedKeyManager.getSharedKey(userId);
+        if (sharedSecret == null) {
+            System.out.print("Shared key not found. Enter a new shared key: ");
+            sharedSecret = scanner.nextLine();
+            try {
+                SharedKeyManager.addOrUpdateSharedKey(userId, sharedSecret);
+            } catch (IOException e) {
+                System.err.println("Failed to save shared key: " + e.getMessage());
                 return;
             }
+        }
 
-            List<Disclosure> disclosures = createDisclosures(allKeys);
-            String credentialJwt = generateCredentialJWT(disclosures, SHARED_SECRET_ISSUER1);
+        try {
+            Map<String, Object> jsonData = collectDataFromUser();
+
+            List<Disclosure> disclosures = createDisclosures(jsonData);
+
+            String credentialJwt = generateCredentialJWT(disclosures, sharedSecret);
+
             SDJWT sdJwt = new SDJWT(credentialJwt, disclosures);
 
-            System.out.println("SD-JWT from Issuer1:");
+            System.out.println("SD-JWT:");
             System.out.println(sdJwt.toString());
         } catch (Exception e) {
             System.err.println("An error occurred: " + e.getMessage());
@@ -40,53 +49,54 @@ public class SDJWT_Issuer1 {
         }
     }
 
-    private static Map<String, Object> parseJson(String jsonContent) throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.readValue(jsonContent, HashMap.class);
+    private static Map<String, Object> collectDataFromUser() {
+        Scanner scanner = new Scanner(System.in);
+        Map<String, Object> jsonData = new LinkedHashMap<>();
+
+        System.out.println("Enter the following details for the Driving License:");
+
+        System.out.print("Full name: ");
+        jsonData.put("Full_name", scanner.nextLine());
+
+        System.out.print("Gender: ");
+        jsonData.put("Gender", scanner.nextLine());
+
+        System.out.print("Date of birth: ");
+        jsonData.put("Date_of_birth", scanner.nextLine());
+
+        System.out.print("License number: ");
+        jsonData.put("License_number", scanner.nextLine());
+
+        System.out.print("Issue date: ");
+        jsonData.put("Issue_date", scanner.nextLine());
+
+        System.out.print("Expiration date: ");
+        jsonData.put("Expiration_date", scanner.nextLine());
+
+        return jsonData;
     }
 
-    private static void extractKeys(String prefix, Map<String, Object> jsonData, Map<String, Object> allKeys) {
-        for (Map.Entry<String, Object> entry : jsonData.entrySet()) {
-            String key = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
-            Object value = entry.getValue();
-            if (value instanceof Map) {
-                extractKeys(key, (Map<String, Object>) value, allKeys);
-            } else if (value instanceof List) {
-                List<?> list = (List<?>) value;
-                for (int i = 0; i < list.size(); i++) {
-                    Object item = list.get(i);
-                    if (item instanceof Map) {
-                        extractKeys(key + "[" + i + "]", (Map<String, Object>) item, allKeys);
-                    } else {
-                        allKeys.put(key + "[" + i + "]", item);
-                    }
-                }
-            } else {
-                allKeys.put(key, value);
-            }
-        }
-    }
-
-    private static List<Disclosure> createDisclosures(Map<String, Object> allKeys) {
+    private static List<Disclosure> createDisclosures(Map<String, Object> jsonData) {
         List<Disclosure> disclosures = new ArrayList<>();
-        for (Map.Entry<String, Object> entry : allKeys.entrySet()) {
-            disclosures.add(new Disclosure(entry.getKey(), Base64.getEncoder().encodeToString(entry.getValue().toString().getBytes())));
+        for (Map.Entry<String, Object> entry : jsonData.entrySet()) {
+            String key = entry.getKey();
+            String value = Base64.getEncoder().encodeToString(((String) entry.getValue()).getBytes());
+            disclosures.add(new Disclosure(key, value));
         }
         return disclosures;
     }
 
-    private static String generateCredentialJWT(List<Disclosure> disclosures, String secret) throws JOSEException {
+    private static String generateCredentialJWT(List<Disclosure> disclosures, String sharedSecret) throws JOSEException {
         JWTClaimsSet.Builder claimsBuilder = new JWTClaimsSet.Builder();
         for (Disclosure disclosure : disclosures) {
             claimsBuilder.claim(disclosure.getClaimName(), disclosure.getClaimValue());
         }
         JWTClaimsSet claimsSet = claimsBuilder.build();
 
-        byte[] sharedSecret = secret.getBytes();
-
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
         SignedJWT signedJWT = new SignedJWT(header, claimsSet);
-        signedJWT.sign(new MACSigner(sharedSecret));
+        System.out.println("sharedSecret.getBytes()"+sharedSecret.getBytes());
+        signedJWT.sign(new MACSigner(sharedSecret.getBytes()));
 
         return signedJWT.serialize();
     }

@@ -1,15 +1,14 @@
 package org.example;
 
 import com.authlete.sd.SDJWT;
-import com.authlete.sd.Disclosure;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.json.JSONObject;
+
 import java.io.*;
 import java.net.Socket;
-import java.text.ParseException;
 import java.util.*;
 
 public class SDJWT_Holder {
@@ -77,9 +76,11 @@ public class SDJWT_Holder {
                 }
                 selectedClaims.add(claims);
             }
-
-            String issuer1Jwt = generateJWT(selectedClaims.get(0), "issuer1", "d4a4c1717b71aa81508edccacc2be8ce1c95867bc90d5d3ad33c3cb0a41b3099");
-            String issuer2Jwt = generateJWT(selectedClaims.get(1), "issuer2", "95c7461240a7194e415341244f3f42e22e59fe35e8f58e61e6e2d0ee75e05a71"); // Replace with your own secret key
+            System.out.println("userId: ");
+            String userId = scanner.nextLine();
+            // Generate the final wrapper JWT
+            String issuer1Jwt = generateJWT(selectedClaims.get(0), userId+"_issuer1");
+            String issuer2Jwt = generateJWT(selectedClaims.get(1), userId+"_issuer2");
 
             JSONObject json = new JSONObject();
             json.put("issuer1", issuer1Jwt);
@@ -88,11 +89,9 @@ public class SDJWT_Holder {
             System.out.println("Final wrapper SD-JWT to send to verifier:");
             System.out.println(json.toString());
 
-            System.out.println("Enter the verifier's address:");
-            String address = scanner.nextLine();
-            System.out.println("Enter the verifier's port:");
-            int port = Integer.parseInt(scanner.nextLine());
-
+            // Sending to verifier
+            String address = "localhost";
+            int port = 8080;
             sendToVerifier(json.toString(), address, port);
 
         } catch (Exception e) {
@@ -108,18 +107,23 @@ public class SDJWT_Holder {
         }
     }
 
-    private static String generateJWT(Map<String, String> claims, String issuer, String secretKey) throws JOSEException {
+    private static String generateJWT(Map<String, String> claims, String issuer) throws JOSEException {
         JWTClaimsSet.Builder claimsBuilder = new JWTClaimsSet.Builder();
         for (Map.Entry<String, String> entry : claims.entrySet()) {
             claimsBuilder.claim(entry.getKey(), entry.getValue());
         }
         JWTClaimsSet claimsSet = claimsBuilder.build();
 
-        byte[] sharedSecret = secretKey.getBytes();
+        // Fetch the shared secret from the shared keys file
+        String sharedSecret = SharedKeyManager.getSharedKey(issuer);
+
+        if (sharedSecret == null) {
+            throw new RuntimeException("Shared key not found for issuer: " + issuer);
+        }
 
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
         SignedJWT signedJWT = new SignedJWT(header, claimsSet);
-        signedJWT.sign(new MACSigner(sharedSecret));
+        signedJWT.sign(new MACSigner(sharedSecret.getBytes()));
 
         return signedJWT.serialize();
     }
