@@ -6,7 +6,7 @@ import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-
+import org.json.JSONObject;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -15,79 +15,64 @@ import java.util.*;
 
 public class SDJWT_Verifier {
 
-    private static final String SHARED_SECRET_ISSUER1 = "d4a4c1717b71aa81508edccacc2be8ce1c95867bc90d5d3ad33c3cb0a41b3099";
-    private static final String SHARED_SECRET_ISSUER2 = "95c7461240a7194e415341244f3f42e22e59fe35e8f58e61e6e2d0ee75e05a71";
-
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("Enter the port to listen on:");
-        int port = Integer.parseInt(scanner.nextLine());
+        try {
+            ServerSocket serverSocket = new ServerSocket(8080);
+            System.out.println("Verifier started. Waiting for incoming connections...");
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Verifier is listening on port " + port);
+            Socket socket = serverSocket.accept();
+            System.out.println("Incoming connection from holder.");
 
-            while (true) {
-                try (Socket socket = serverSocket.accept();
-                     BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                     PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-                    String sdJwtString = in.readLine();
-                    SDJWT sdJwt = SDJWT.parse(sdJwtString);
-                    boolean isValid = decodeAndVerifySDJWT(sdJwt);
+            String jsonStr = in.readLine();
+            JSONObject json = new JSONObject(jsonStr);
 
-                    if (isValid) {
-                        out.println("SD-JWT is valid and verified.");
-                    } else {
-                        out.println("SD-JWT is invalid.");
-                    }
+            String issuer1Jwt = json.getString("issuer1");
+            String issuer2Jwt = json.getString("issuer2");
 
-                } catch (ParseException | JOSEException e) {
-                    System.err.println("Error occurred while decoding SD-JWT: " + e.getMessage());
+            JWSVerifier verifierIssuer1 = new MACVerifier("d4a4c1717b71aa81508edccacc2be8ce1c95867bc90d5d3ad33c3cb0a41b3099".getBytes());
+            JWSVerifier verifierIssuer2 = new MACVerifier("1234567890abcdef1234567890abcdef".getBytes());
+
+            SignedJWT signedJwt1 = SignedJWT.parse(issuer1Jwt);
+            SignedJWT signedJwt2 = SignedJWT.parse(issuer2Jwt);
+
+            if (signedJwt1.verify(verifierIssuer1)) {
+                System.out.println("Signature verified with Issuer1's secret: VALID");
+                JWTClaimsSet claimsSet1 = signedJwt1.getJWTClaimsSet();
+                Map<String, Object> claimsMap1 = claimsSet1.getClaims();
+                System.out.println("Claims from Issuer1:");
+                for (Map.Entry<String, Object> entry : claimsMap1.entrySet()) {
+                    String claimName = entry.getKey();
+                    String claimValue = new String(Base64.getDecoder().decode((String) entry.getValue()));
+                    System.out.println(claimName + ": " + claimValue);
                 }
+                out.println("VALID_Issuer1");
+            } else {
+                System.out.println("Signature verified with Issuer1's secret: INVALID");
+                out.println("INVALID_Issuer1");
             }
-        } catch (IOException e) {
-            System.err.println("Error occurred while setting up server: " + e.getMessage());
-        }
-    }
 
-    private static boolean decodeAndVerifySDJWT(SDJWT sdJwt) throws ParseException, JOSEException {
-        String jwtString = sdJwt.getCredentialJwt();
-        SignedJWT signedJWT = SignedJWT.parse(jwtString);
-
-        JWSVerifier verifierIssuer1 = new MACVerifier(SHARED_SECRET_ISSUER1.getBytes());
-        JWSVerifier verifierIssuer2 = new MACVerifier(SHARED_SECRET_ISSUER2.getBytes());
-
-        boolean isValid = false;
-
-        if (signedJWT.verify(verifierIssuer1)) {
-            System.out.println("Signature verified with Issuer1's secret: VALID");
-            isValid = true;
-        } else if (signedJWT.verify(verifierIssuer2)) {
-            System.out.println("Signature verified with Issuer2's secret: VALID");
-            isValid = true;
-        } else {
-            System.out.println("Signature: INVALID");
-        }
-
-        if (isValid) {
-            JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
-            List<Disclosure> disclosures = sdJwt.getDisclosures();
-
-            System.out.println("JWT Header:");
-            JWSHeader header = signedJWT.getHeader();
-            System.out.println(header.toJSONObject());
-
-            System.out.println("JWT Payload:");
-            System.out.println(claimsSet.toJSONObject());
-
-            System.out.println("Disclosures:");
-            for (Disclosure disclosure : disclosures) {
-                String claimValue = (String) disclosure.getClaimValue();
-                String decodedValue = new String(Base64.getDecoder().decode(claimValue.getBytes()));
-                System.out.println(disclosure.getClaimName() + ": " + decodedValue);
+            if (signedJwt2.verify(verifierIssuer2)) {
+                System.out.println("Signature verified with Issuer2's secret: VALID");
+                JWTClaimsSet claimsSet2 = signedJwt2.getJWTClaimsSet();
+                Map<String, Object> claimsMap2 = claimsSet2.getClaims();
+                System.out.println("Claims from Issuer2:");
+                for (Map.Entry<String, Object> entry : claimsMap2.entrySet()) {
+                    String claimName = entry.getKey();
+                    String claimValue = new String(Base64.getDecoder().decode((String) entry.getValue()));
+                    System.out.println(claimName + ": " + claimValue);
+                }
+                out.println("VALID_Issuer2");
+            } else {
+                System.out.println("Signature verified with Issuer2's secret: INVALID");
+                out.println("INVALID_Issuer2");
             }
-        }
 
-        return isValid;
+        } catch (Exception e) {
+            System.err.println("An error occurred: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
