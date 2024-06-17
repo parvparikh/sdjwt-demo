@@ -39,28 +39,8 @@ public class SDJWT_Holder {
                 return;
             }
 
-            displaySDJWTS(sdJwts);
-            System.out.println("Enter the numbers of the SD-JWTs to include in the wrapper SD-JWT (comma-separated):");
-            String input = scanner.nextLine();
-            String[] selectedNumbers = input.split(",");
-
-            List<SDJWT> selectedSDJWTS = new ArrayList<>();
-            for (String numberStr : selectedNumbers) {
-                int number = Integer.parseInt(numberStr.trim()) - 1;
-                if (number >= 0 && number < sdJwts.size()) {
-                    selectedSDJWTS.add(sdJwts.get(number));
-                } else {
-                    System.out.println("Warning: Number '" + (number + 1) + "' is out of range and will be ignored.");
-                }
-            }
-
-            if (selectedSDJWTS.isEmpty()) {
-                System.out.println("No SD-JWTs selected.");
-                return;
-            }
-
             List<Map<String, String>> selectedClaims = new ArrayList<>();
-            for (SDJWT sdJwt : selectedSDJWTS) {
+            for (SDJWT sdJwt : sdJwts) {
                 Map<String, String> claims = new HashMap<>();
                 System.out.println("Select claims for SD-JWT " + sdJwt.toString() + ":");
                 String token = sdJwt.getCredentialJwt();
@@ -78,13 +58,36 @@ public class SDJWT_Holder {
             }
             System.out.println("userId: ");
             String userId = scanner.nextLine();
-            // Generate the final wrapper JWT
-            String issuer1Jwt = generateJWT(selectedClaims.get(0), userId+"_issuer1");
-            String issuer2Jwt = generateJWT(selectedClaims.get(1), userId+"_issuer2");
+            String issuer1 = userId + "_issuer1";
+            String issuer2 = userId + "_issuer2";
+
+            String issuer1Jwt = null;
+            String issuer2Jwt = null;
+
+            if (SharedKeyManager.getSharedKey(issuer1)!= null) {
+                issuer1Jwt = generateJWT(selectedClaims.get(0), issuer1);
+            }
+
+            if (SharedKeyManager.getSharedKey(issuer2)!= null) {
+                issuer2Jwt = generateJWT(selectedClaims.get(1), issuer2);
+            }
 
             JSONObject json = new JSONObject();
-            json.put("issuer1", issuer1Jwt);
-            json.put("issuer2", issuer2Jwt);
+
+            if (issuer1Jwt!= null) {
+                json.put("issuer1", issuer1Jwt);
+                System.out.println("Using issuer1");
+            }
+
+            if (issuer2Jwt!= null) {
+                json.put("issuer2", issuer2Jwt);
+                System.out.println("Using issuer2");
+            }
+
+            if (json.length() == 0) {
+                System.out.println("No issuers available.");
+                return;
+            }
 
             System.out.println("Final wrapper SD-JWT to send to verifier:");
             System.out.println(json.toString());
@@ -97,13 +100,6 @@ public class SDJWT_Holder {
         } catch (Exception e) {
             System.err.println("An error occurred: " + e.getMessage());
             e.printStackTrace();
-        }
-    }
-
-    private static void displaySDJWTS(List<SDJWT> sdJwts) {
-        System.out.println("Available SD-JWTs:");
-        for (int i = 0; i < sdJwts.size(); i++) {
-            System.out.println((i + 1) + ". " + sdJwts.get(i).toString());
         }
     }
 

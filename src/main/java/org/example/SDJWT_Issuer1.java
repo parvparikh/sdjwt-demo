@@ -20,12 +20,12 @@ public class SDJWT_Issuer1 {
         System.out.print("Enter user ID for Issuer1: ");
         String userId = scanner.nextLine();
 
-        String sharedSecret = SharedKeyManager.getSharedKey(userId);
+        String sharedSecret = SharedKeyManager.getSharedKey(userId+"_issuer1");
         if (sharedSecret == null) {
             System.out.print("Shared key not found. Enter a new shared key: ");
             sharedSecret = scanner.nextLine();
             try {
-                SharedKeyManager.addOrUpdateSharedKey(userId, sharedSecret);
+                SharedKeyManager.addOrUpdateSharedKey(userId+"_issuer1", sharedSecret);
             } catch (IOException e) {
                 System.err.println("Failed to save shared key: " + e.getMessage());
                 return;

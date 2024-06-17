@@ -6,8 +6,11 @@ import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import org.json.JSONObject;
 
 import java.text.ParseException;
+import java.util.Base64;
+import java.util.Map;
 import java.util.Scanner;
 
 public class JWTDecoder {
@@ -38,8 +41,15 @@ public class JWTDecoder {
 
             // Display the JWT payload
             JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
-            System.out.println("JWT Payload:");
-            System.out.println(claimsSet.toJSONObject());
+            Map<String, Object> claims = claimsSet.getClaims();
+
+            System.out.println("JWT Payload (Decoded):");
+            for (Map.Entry<String, Object> entry : claims.entrySet()) {
+                String claimName = entry.getKey();
+                String encodedClaimValue = entry.getValue().toString();
+                String decodedClaimValue = new String(Base64.getUrlDecoder().decode(encodedClaimValue));
+                System.out.println(claimName + ": " + decodedClaimValue);
+            }
 
             // Display the JWT signature verification status
             System.out.println("Signature Verification Status: " + (isVerified ? "VALID" : "INVALID"));

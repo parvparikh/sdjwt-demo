@@ -37,7 +37,7 @@ public class SDJWT_Verifier {
                         String sharedSecretIssuer1 = SharedKeyManager.getSharedKey(userId + "_issuer1");
                         String sharedSecretIssuer2 = SharedKeyManager.getSharedKey(userId + "_issuer2");
 
-                        if (sharedSecretIssuer1 == null || sharedSecretIssuer2 == null) {
+                        if (sharedSecretIssuer1 == null && sharedSecretIssuer2 == null) {
                             System.out.println("Shared key not found for user ID: " + userId);
                             out.println("Shared key not found for user ID: " + userId);
                             continue;
@@ -47,51 +47,56 @@ public class SDJWT_Verifier {
                         String jsonStr = in.readLine();
                         JSONObject json = new JSONObject(jsonStr);
 
-                        String issuer1Jwt = json.getString("issuer1");
-                        String issuer2Jwt = json.getString("issuer2");
-
-                        JWSVerifier verifierIssuer1 = new MACVerifier(sharedSecretIssuer1.getBytes());
-                        JWSVerifier verifierIssuer2 = new MACVerifier(sharedSecretIssuer2.getBytes());
-
-                        SignedJWT signedJwt1 = SignedJWT.parse(issuer1Jwt);
-                        SignedJWT signedJwt2 = SignedJWT.parse(issuer2Jwt);
-
                         StringBuilder response = new StringBuilder();
 
-                        // Verify and print claims from issuer1
-                        if (signedJwt1.verify(verifierIssuer1)) {
-                            response.append("Issuer1_VALID");
-                            System.out.println("Signature verified with Issuer1's secret: VALID");
-                            JWTClaimsSet claimsSet1 = signedJwt1.getJWTClaimsSet();
-                            Map<String, Object> claimsMap1 = claimsSet1.getClaims();
-                            System.out.println("Claims from Issuer1:");
-                            for (Map.Entry<String, Object> entry : claimsMap1.entrySet()) {
-                                String claimName = entry.getKey();
-                                String claimValue = new String(Base64.getDecoder().decode((String) entry.getValue()));
-                                System.out.println(claimName + ": " + claimValue);
+                        if (json.has("issuer1") && sharedSecretIssuer1 != null) {
+                            String issuer1Jwt = json.getString("issuer1");
+                            JWSVerifier verifierIssuer1 = new MACVerifier(sharedSecretIssuer1.getBytes());
+                            SignedJWT signedJwt1 = SignedJWT.parse(issuer1Jwt);
+
+                            if (signedJwt1.verify(verifierIssuer1)) {
+                                response.append("Issuer1_VALID");
+                                System.out.println("Signature verified with Issuer1's secret: VALID");
+                                JWTClaimsSet claimsSet1 = signedJwt1.getJWTClaimsSet();
+                                Map<String, Object> claimsMap1 = claimsSet1.getClaims();
+                                System.out.println("Claims from Issuer1:");
+                                for (Map.Entry<String, Object> entry : claimsMap1.entrySet()) {
+                                    String claimName = entry.getKey();
+                                    String claimValue = new String(Base64.getDecoder().decode((String) entry.getValue()));
+                                    System.out.println(claimName + ": " + claimValue);
+                                }
+                            } else {
+                                response.append("Issuer1_INVALID");
+                                System.out.println("Signature verified with Issuer1's secret: INVALID");
                             }
                         } else {
-                            response.append("Issuer1_INVALID");
-                            System.out.println("Signature verified with Issuer1's secret: INVALID");
+                            response.append("Issuer1_NOT_AVAILABLE");
                         }
 
                         response.append(",");
 
-                        // Verify and print claims from issuer2
-                        if (signedJwt2.verify(verifierIssuer2)) {
-                            response.append("Issuer2_VALID");
-                            System.out.println("Signature verified with Issuer2's secret: VALID");
-                            JWTClaimsSet claimsSet2 = signedJwt2.getJWTClaimsSet();
-                            Map<String, Object> claimsMap2 = claimsSet2.getClaims();
-                            System.out.println("Claims from Issuer2:");
-                            for (Map.Entry<String, Object> entry : claimsMap2.entrySet()) {
-                                String claimName = entry.getKey();
-                                String claimValue = new String(Base64.getDecoder().decode((String) entry.getValue()));
-                                System.out.println(claimName + ": " + claimValue);
+                        if (json.has("issuer2") && sharedSecretIssuer2 != null) {
+                            String issuer2Jwt = json.getString("issuer2");
+                            JWSVerifier verifierIssuer2 = new MACVerifier(sharedSecretIssuer2.getBytes());
+                            SignedJWT signedJwt2 = SignedJWT.parse(issuer2Jwt);
+
+                            if (signedJwt2.verify(verifierIssuer2)) {
+                                response.append("Issuer2_VALID");
+                                System.out.println("Signature verified with Issuer2's secret: VALID");
+                                JWTClaimsSet claimsSet2 = signedJwt2.getJWTClaimsSet();
+                                Map<String, Object> claimsMap2 = claimsSet2.getClaims();
+                                System.out.println("Claims from Issuer2:");
+                                for (Map.Entry<String, Object> entry : claimsMap2.entrySet()) {
+                                    String claimName = entry.getKey();
+                                    String claimValue = new String(Base64.getDecoder().decode((String) entry.getValue()));
+                                    System.out.println(claimName + ": " + claimValue);
+                                }
+                            } else {
+                                response.append("Issuer2_INVALID");
+                                System.out.println("Signature verified with Issuer2's secret: INVALID");
                             }
                         } else {
-                            response.append("Issuer2_INVALID");
-                            System.out.println("Signature verified with Issuer2's secret: INVALID");
+                            response.append("Issuer2_NOT_AVAILABLE");
                         }
 
                         // Send the combined result back to the holder
